@@ -1,0 +1,90 @@
+version: '3.8'
+services:
+  database:
+    container_name: influxdb
+    image: influxdb_image
+    restart: always
+    ports:
+      - 8086:8086
+    build: 
+      context: .
+      dockerfile: services/influx/Dockerfile
+    networks:
+      default:
+        aliases:
+          - influxdb
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=admin
+      - DOCKER_INFLUXDB_INIT_PASSWORD=my-password
+      - DOCKER_INFLUXDB_INIT_ORG=my-org
+      - DOCKER_INFLUXDB_INIT_BUCKET=my-bucket 
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=my-admin-token
+
+  broker:
+    container_name: rabbit
+    image: rabbit_image
+    restart: always
+    ports:
+      - 1883:1883
+      - 15672:15672
+      - 5672:5672
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+    build: 
+      context: .
+      dockerfile: services/rabbit/Dockerfile
+    networks:
+      default:
+        aliases:
+          - rabbit
+
+  visualizador:
+    container_name: grafana
+    image: grafana_image
+    restart: always
+    ports:
+      - 3000:3000
+    build: 
+      context: .
+      dockerfile: services/grafana/Dockerfile
+    environment:
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_SECURITY_ALLOW_EMBEDDING=true
+    networks:
+      default:
+        aliases:
+          - grafana
+
+
+  telegraf:
+    container_name: telegraf
+    image: telegraf:1.25.0
+    restart: always
+    depends_on: 
+      - database
+      - broker
+    environment:
+      - INFLUX_TOKEN=my-admin-token
+    volumes:
+      - ./services/telegraf/rabbit.conf:/etc/telegraf/telegraf.conf
+    links:
+      - database
+
+  analytics:
+    container_name: analitica
+    image: analytics_image
+    restart: always
+    build:
+      context: .
+      dockerfile:  services/analitica/Dockerfile
+    depends_on:
+      - database
+      - broker
+      - telegraf
+  
+
+
